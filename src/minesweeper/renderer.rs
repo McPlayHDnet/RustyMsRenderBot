@@ -2,19 +2,18 @@ use std::collections::BTreeMap;
 use std::io::Cursor;
 use std::time::Duration;
 
-use gif::{Encoder, Frame as GifFrame, Repeat};
-use image::{Delay, DynamicImage, Frame, GenericImage, ImageBuffer, Rgba};
-
 use crate::minesweeper::error::MinesweeperError;
 use crate::minesweeper::minesweeper_logic::{Board, FieldState};
 use crate::minesweeper::parsers::parser::{ActionType, FlagAction, Metadata, OpenAction};
 use crate::minesweeper::textures::load_textures;
+use gif::{Encoder, Frame as GifFrame, Repeat};
+use image::{Delay, DynamicImage, Frame, GenericImage, ImageBuffer, Rgba};
 
 pub struct Renderer {
     pub(crate) metadata: Metadata,
-    game_board: Board,
-    open_data: Vec<OpenAction>,
-    flag_data: Vec<FlagAction>,
+    pub(crate) game_board: Board,
+    pub open_data: Vec<OpenAction>,
+    pub flag_data: Vec<FlagAction>,
     image_data: Imagedata,
 }
 
@@ -206,7 +205,7 @@ impl Renderer {
         for (_i, image) in frames.into_iter().enumerate() {
             let frame_delay = image.delay().numer_denom_ms().0 / 10;
             let rbga_frame = &mut image.into_buffer();
-            let mut frame = GifFrame::from_rgba_speed(width as u16, height as u16, rbga_frame, 1);
+            let mut frame = GifFrame::from_rgba_speed(width as u16, height as u16, rbga_frame, 10);
             frame.delay = frame_delay as u16;
             frame.dispose = gif::DisposalMethod::Keep;
 
@@ -256,14 +255,15 @@ impl Renderer {
         let imgx = (self.metadata.x_size * 32) as u32;
         let imgy = ((self.metadata.y_size * 32) as u32) + progressbar_height;
 
-        let mut imgbuf = image::ImageBuffer::new(imgx, imgy);
+        // Initialize with a non-black transparent color to work around potential Discord rendering quirks
+        let mut imgbuf = image::ImageBuffer::from_pixel(imgx, imgy, Rgba([1, 1, 1, 0]));
 
         for x in 0..self.metadata.x_size as u32 {
             for y in 0..self.metadata.y_size as u32 {
                 let field = &self.game_board.fields[y as usize][x as usize];
 
                 // Only render fields that got changed in the last iteration
-                if !self.game_board.changed_fields[y as usize][x as usize] {
+                if !self.game_board.changed_fields[y as usize][x as usize] && percentage != 100 {
                     continue;
                 }
 
